@@ -1,199 +1,264 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Travel Animation</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: system-ui, sans-serif;
-            background-color: #000010;
-            color: white;
-        }
-        .container {
-            width: 100vw;
-            height: 100vh;
-            cursor: grab;
-        }
-        .info {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 10px 20px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            z-index: 10;
-        }
-        /* --- Style for the new footer --- */
-        .footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            padding: 15px 0;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9em;
-            z-index: 10;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Global Travel Visualizer</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #000010;
+      color: #fff;
+      overflow: hidden;
+    }
+    .container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    .info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 30, 0.7);
+      padding: 15px 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      z-index: 10;
+    }
+    .info h1 {
+      font-size: 1.4rem;
+      margin: 0 0 5px;
+    }
+    .legend {
+      margin-top: 10px;
+      font-size: 0.85rem;
+    }
+    .legend span {
+      display: inline-block;
+      margin-right: 10px;
+    }
+    .legend .flight {
+      color: #ffff66;
+    }
+    .legend .ship {
+      color: #66ffff;
+    }
+    .footer {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      padding: 12px 0;
+      background: rgba(0, 0, 30, 0.6);
+      font-size: 0.9em;
+      z-index: 10;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .tooltip {
+      position: absolute;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      display: none;
+      pointer-events: none;
+      z-index: 999;
+      white-space: nowrap;
+    }
+  </style>
 </head>
 <body>
-    
-    <div id="globeViz" class="container"></div>
-    <div class="info">
-        <h1>Global Travel Routes</h1>
-        <p>Drag to explore. Hover over countries and points.</p>
+  <div class="container" id="globeViz"></div>
+  <div class="info">
+    <h1>🌍 Global Travel Routes</h1>
+    <p>Click to view location. Drag to rotate, scroll to zoom.</p>
+    <div class="legend">
+      <span class="flight">✈️ Flight</span>
+      <span class="ship">🚢 Ship</span>
     </div>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
+  <footer class="footer">Developed by Farhan · Real-time Route Visualizer</footer>
 
-    <footer class="footer">
-        Developed by Farhan
-    </footer>
+  <!-- ✅ Proper Three.js + Loader -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.140.2/examples/js/loaders/GLTFLoader.js"></script>
 
-    <script src="//unpkg.com/three"></script>
-    <script src="//unpkg.com/three/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="//unpkg.com/globe.gl"></script>
-    <script src="//unpkg.com/topojson-client"></script>
+  <!-- Globe and TopoJSON -->
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script src="https://unpkg.com/topojson-client"></script>
 
-    <script>
-        // NOTE: This version of the script has loading issues. 
-        // A corrected version using ES Modules was provided previously.
+  <script>
+    const locations = {
+      dhaka: { lat: 23.8103, lng: 90.4125, name: 'Dhaka 🇧🇩' },
+      stockholm: { lat: 59.3293, lng: 18.0686, name: 'Stockholm 🇸🇪' },
+      riyadh: { lat: 24.7136, lng: 46.6753, name: 'Riyadh 🇸🇦' },
+      newYork: { lat: 40.7128, lng: -74.0060, name: 'New York 🇺🇸' },
+      sydney: { lat: -33.8688, lng: 151.2093, name: 'Sydney 🇦🇺' },
+      tokyo: { lat: 35.6895, lng: 139.6917, name: 'Tokyo 🇯🇵' },
+      singaporePort: { lat: 1.2646, lng: 103.8358, name: 'Singapore Port 🇸🇬' },
+      rotterdamPort: { lat: 51.9225, lng: 4.47917, name: 'Rotterdam Port 🇳🇱' },
+      losAngelesPort: { lat: 33.7292, lng: -118.2620, name: 'Los Angeles Port 🇺🇸' }
+    };
 
-        // === 1. DATA SETUP ===
-        const locations = {
-            dhaka: { lat: 23.8103, lng: 90.4125, name: 'Dhaka 🇧🇩' },
-            stockholm: { lat: 59.3293, lng: 18.0686, name: 'Stockholm 🇸🇪' },
-            riyadh: { lat: 24.7136, lng: 46.6753, name: 'Riyadh 🇸🇦' },
-            newYork: { lat: 40.7128, lng: -74.0060, name: 'New York 🇺🇸' },
-            sydney: { lat: -33.8688, lng: 151.2093, name: 'Sydney 🇦🇺' },
-            tokyo: { lat: 35.6895, lng: 139.6917, name: 'Tokyo 🇯🇵' },
-            singaporePort: { lat: 1.2646, lng: 103.8358, name: 'Singapore Port 🇸🇬' },
-            rotterdamPort: { lat: 51.9225, lng: 4.47917, name: 'Rotterdam Port 🇳🇱' },
-            losAngelesPort: { lat: 33.7292, lng: -118.2620, name: 'Los Angeles Port 🇺🇸' }
-        };
-        const travelRoutes = [
-            { start: locations.dhaka, end: locations.stockholm, type: 'flight' },
-            { start: locations.stockholm, end: locations.riyadh, type: 'flight' },
-            { start: locations.newYork, end: locations.tokyo, type: 'flight' },
-            { start: locations.sydney, end: locations.newYork, type: 'flight' },
-            { start: locations.singaporePort, end: locations.rotterdamPort, type: 'ship' },
-            { start: locations.tokyo, end: locations.losAngelesPort, type: 'ship' }
-        ];
-        const arcsData = travelRoutes.map(route => ({
-            startLat: route.start.lat,
-            startLng: route.start.lng,
-            endLat: route.end.lat,
-            endLng: route.end.lng,
-            color: route.type === 'flight' ? 'rgba(255, 255, 0, 0.6)' : 'rgba(0, 255, 255, 0.6)',
-            stroke: route.type === 'flight' ? 0.3 : 0.4
-        }));
-        
-        // === 2. 3D MODELS & GLOBE SETUP ===
-        const planeModel = {
-            url: 'https://unpkg.com/three-globe/example/objects/airplane.glb',
-            scale: 0.008,
-            altitude: 0.03,
-            rotation: { x: Math.PI / 2, y: 0, z: 0 }
-        };
-        const shipModel = {
-            url: 'https://assets.codepen.io/285018/boat-small.glb',
-            scale: 0.015,
-            altitude: 0,
-            rotation: { x: Math.PI / 2, y: 0, z: Math.PI }
-        };
-        const movingObjectsData = [];
-        let time = 0;
+    const travelRoutes = [
+      { start: locations.dhaka, end: locations.stockholm, type: 'flight' },
+      { start: locations.stockholm, end: locations.riyadh, type: 'flight' },
+      { start: locations.newYork, end: locations.tokyo, type: 'flight' },
+      { start: locations.sydney, end: locations.newYork, type: 'flight' },
+      { start: locations.singaporePort, end: locations.rotterdamPort, type: 'ship' },
+      { start: locations.tokyo, end: locations.losAngelesPort, type: 'ship' }
+    ];
 
-        const globe = Globe()
-            (document.getElementById('globeViz'))
-            .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
-            .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
-            .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
-            .atmosphereColor('rgba(60, 120, 200, 0.5)')
-            .atmosphereAltitude(0.2)
-            .pointsData(Object.values(locations))
-            .pointColor(() => '#f8cdda')
-            .pointAltitude(0.005)
-            .pointRadius(0.3)
-            .pointLabel('name')
-            .arcsData(arcsData)
-            .arcColor('color')
-            .arcStroke('stroke')
-            .arcDashLength(0.4)
-            .arcDashGap(0.2)
-            .arcDashAnimateTime(4000)
-            .objectsData(movingObjectsData)
-            .objectThreeObject(d => d.model)
-            .objectLat(d => d.lat)
-            .objectLng(d => d.lng)
-            .objectAltitude(d => d.alt)
-            .objectRotation(d => d.rotation)
-            .objectFacesSurface(false);
+    const arcsData = travelRoutes.map(route => ({
+      startLat: route.start.lat,
+      startLng: route.start.lng,
+      endLat: route.end.lat,
+      endLng: route.end.lng,
+      color: route.type === 'flight' ? 'rgba(255,255,102,0.7)' : 'rgba(102,255,255,0.7)',
+      stroke: route.type === 'flight' ? 0.4 : 0.5
+    }));
 
-        // === 3. COUNTRY POLYGONS & LABELS ===
-        fetch('//unpkg.com/world-atlas/countries-110m.json')
-            .then(res => res.json())
-            .then(countries => {
-                const geoJson = topojson.feature(countries, countries.objects.countries);
-                globe.polygonsData(geoJson.features)
-                    .polygonCapColor(() => 'rgba(0, 0, 0, 0)')
-                    .polygonSideColor(() => 'rgba(255, 255, 255, 0.1)')
-                    .polygonStrokeColor(() => '#6688cc')
-                    .polygonLabel(({ properties: d }) => `<b>${d.ADMIN}</b>`);
-            });
+    const globe = Globe()(document.getElementById('globeViz'))
+      .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+      .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
+      .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+      .atmosphereColor('#3a90e6')
+      .atmosphereAltitude(0.25)
+      .arcsData(arcsData)
+      .arcColor('color')
+      .arcStroke('stroke')
+      .arcDashLength(0.5)
+      .arcDashGap(0.2)
+      .arcDashAnimateTime(4000)
+      .pointsData(Object.values(locations))
+      .pointLat(p => p.lat)
+      .pointLng(p => p.lng)
+      .pointLabel(p => p.name)
+      .pointColor(() => 'orange')
+      .pointRadius(0.3)
+      .pointAltitude(0.02);
 
-        // === 4. ANIMATION LOGIC ===
-        const getArcPoint = (progress, startLat, startLng, endLat, endLng) => {
-            const B = (t) => t * t * (3 - 2 * t);
-            const t = B(progress);
-            const lat = startLat + (endLat - startLat) * t;
-            const lng = startLng + (endLng - startLng) * t;
-            return { lat, lng };
-        };
-        
-        (function animate() {
-            time += 0.0003;
-            movingObjectsData.length = 0;
-            travelRoutes.forEach(route => {
-                const progress = (time + Math.random()) % 1;
-                const { lat, lng } = getArcPoint(progress, route.start.lat, route.start.lng, route.end.lat, route.end.lng);
-                
-                let model, alt;
-                if(route.type === 'flight') {
-                    model = new THREE.Object3D();
-                    new THREE.GLTFLoader().load(planeModel.url, gltf => {
-                       model.add(gltf.scene);
-                    });
-                    model.scale.set(planeModel.scale, planeModel.scale, planeModel.scale);
-                    alt = planeModel.altitude * Math.sin(progress * Math.PI);
-                } else {
-                    model = new THREE.Object3D();
-                    new THREE.GLTFLoader().load(shipModel.url, gltf => {
-                       model.add(gltf.scene);
-                    });
-                    model.scale.set(shipModel.scale, shipModel.scale, shipModel.scale);
-                    alt = shipModel.altitude;
-                }
-                movingObjectsData.push({
-                    lat, lng, alt, model,
-                    rotation: route.type === 'flight' ? planeModel.rotation : shipModel.rotation
-                });
-            });
-            
-            globe.objectsData(movingObjectsData);
-            requestAnimationFrame(animate);
-        })();
+    // Load countries and bind __data
+    fetch('//unpkg.com/world-atlas/countries-110m.json')
+      .then(res => res.json())
+      .then(worldData => {
+        const geoJson = topojson.feature(worldData, worldData.objects.countries);
+        globe.polygonsData(geoJson.features)
+          .polygonCapColor(() => 'rgba(255,255,255,0.03)')
+          .polygonSideColor(() => 'rgba(0,0,0,0.3)')
+          .polygonStrokeColor(() => '#5588ff')
+          .polygonLabel(({ properties: d }) => `<b>${d.ADMIN}</b>`);
 
-        // === 5. CAMERA CONTROLS ===
-        globe.controls().autoRotate = true;
-        globe.controls().autoRotateSpeed = 0.2;
-        globe.controls().enableZoom = true;
-        
-        globe.pointOfView({ lat: 30, lng: 45, altitude: 2.5 }, 3000);
+        setTimeout(() => {
+          globe.polygonsData().forEach(p => {
+            if (p.__threeObj) p.__threeObj.__data = p;
+          });
+        }, 1000);
+      });
 
-    </script>
+    // Assign __data for points
+    setTimeout(() => {
+      globe.pointsData().forEach(p => {
+        if (p.__threeObj) p.__threeObj.__data = p;
+      });
+    }, 1000);
+
+    // Animate planes/ships
+    const planeModel = {
+      url: 'https://unpkg.com/three-globe/example/objects/airplane.glb',
+      scale: 0.008, altitude: 0.04,
+      rotation: { x: Math.PI / 2, y: 0, z: 0 }
+    };
+    const shipModel = {
+      url: 'https://assets.codepen.io/285018/boat-small.glb',
+      scale: 0.015, altitude: 0,
+      rotation: { x: Math.PI / 2, y: 0, z: Math.PI }
+    };
+
+    const movingObjectsData = [];
+    let time = 0;
+
+    function getArcPoint(progress, startLat, startLng, endLat, endLng) {
+      const B = (t) => t * t * (3 - 2 * t);
+      const t = B(progress);
+      const lat = startLat + (endLat - startLat) * t;
+      const lng = startLng + (endLng - startLng) * t;
+      return { lat, lng };
+    }
+
+    (function animate() {
+      time += 0.0004;
+      movingObjectsData.length = 0;
+
+      travelRoutes.forEach(route => {
+        const progress = (time + Math.random()) % 1;
+        const { lat, lng } = getArcPoint(progress, route.start.lat, route.start.lng, route.end.lat, route.end.lng);
+        let model = new THREE.Object3D();
+        const loader = new THREE.GLTFLoader();
+        const selected = route.type === 'flight' ? planeModel : shipModel;
+
+        loader.load(selected.url, gltf => {
+          model.add(gltf.scene);
+        });
+
+        model.scale.set(selected.scale, selected.scale, selected.scale);
+        movingObjectsData.push({
+          lat, lng,
+          alt: selected.altitude * (route.type === 'flight' ? Math.sin(progress * Math.PI) : 1),
+          model,
+          rotation: selected.rotation
+        });
+      });
+
+      globe.objectsData(movingObjectsData);
+      requestAnimationFrame(animate);
+    })();
+
+    globe.controls().autoRotate = true;
+    globe.controls().autoRotateSpeed = 0.25;
+    globe.pointOfView({ lat: 30, lng: 20, altitude: 2.5 }, 4000);
+
+    // Click interaction
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const canvas = document.querySelector('canvas');
+    const tooltip = document.getElementById('tooltip');
+
+    canvas.addEventListener('click', (event) => {
+      const { left, top, width, height } = canvas.getBoundingClientRect();
+      mouse.x = ((event.clientX - left) / width) * 2 - 1;
+      mouse.y = -((event.clientY - top) / height) * 2 + 1;
+      raycaster.setFromCamera(mouse, globe.camera());
+
+      // Points
+      const pointHits = raycaster.intersectObjects(
+        globe.pointsData().map(p => p.__threeObj).filter(Boolean), true
+      );
+      if (pointHits.length > 0 && pointHits[0].object.__data?.name) {
+        showTooltip(event.clientX, event.clientY, `📍 ${pointHits[0].object.__data.name}`);
+        return;
+      }
+
+      // Countries
+      const polyHits = raycaster.intersectObjects(
+        globe.polygonsData().map(p => p.__threeObj).filter(Boolean), true
+      );
+      if (polyHits.length > 0 && polyHits[0].object.__data?.properties?.ADMIN) {
+        showTooltip(event.clientX, event.clientY, `📍 ${polyHits[0].object.__data.properties.ADMIN}`);
+      } else {
+        tooltip.style.display = 'none';
+      }
+    });
+
+    function showTooltip(x, y, text) {
+      tooltip.innerHTML = text;
+      tooltip.style.left = `${x + 10}px`;
+      tooltip.style.top = `${y + 10}px`;
+      tooltip.style.display = 'block';
+    }
+  </script>
 </body>
 </html>
